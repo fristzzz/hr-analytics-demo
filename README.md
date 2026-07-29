@@ -14,20 +14,24 @@
 https://raw.githubusercontent.com/<用户名>/<仓库名>/main/data/csv/<文件名>.csv
 ```
 
-### 推荐导入清单
+### 本仓库 Raw 直链（可直接粘贴到 Power BI）
 
-| 表 | 用途 |
-|----|------|
-| dim_date.csv | 日期维度（可选） |
-| dim_org.csv | 部门 |
-| dim_level.csv | 职级 |
-| dim_employee.csv | 员工 |
-| dim_leave_reason.csv | 离职原因 |
-| fact_snapshot.csv | 月末在职快照 |
-| fact_event.csv | 人事事件 |
-| fact_cost.csv | 月度成本 |
-| fact_hc_budget.csv | 编制 |
-| agg_monthly_kpi.csv | 仅校验，可不进模型 |
+仓库：https://github.com/fristzzz/hr-analytics-demo  
+
+| 表 | Raw URL |
+|----|---------|
+| dim_date | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/dim_date.csv |
+| dim_org | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/dim_org.csv |
+| dim_level | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/dim_level.csv |
+| dim_employee | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/dim_employee.csv |
+| dim_leave_reason | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/dim_leave_reason.csv |
+| fact_snapshot | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/fact_snapshot.csv |
+| fact_event | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/fact_event.csv |
+| fact_cost | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/fact_cost.csv |
+| fact_hc_budget | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/fact_hc_budget.csv |
+| agg_monthly_kpi（校验） | https://raw.githubusercontent.com/fristzzz/hr-analytics-demo/main/data/csv/agg_monthly_kpi.csv |
+
+浏览器先打开任意一条，应直接看到 CSV 文本。
 
 ### 建模型要点
 

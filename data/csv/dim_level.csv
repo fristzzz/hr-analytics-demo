@@ -1,0 +1,8 @@
+﻿level_code,level_name,level_band,salary_mid,sort_order
+L1,专员,IC,8000,1
+L2,高级专员,IC,11000,2
+L3,专家/主管,IC,16000,3
+L4,资深/经理,M,22000,4
+L5,高级经理,M,30000,5
+L6,总监,M,42000,6
+L7,VP/总经理,E,65000,7

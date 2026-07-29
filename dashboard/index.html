@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人力薪酬分析看板 · 面试演示</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222d;
+      --panel2: #222c3a;
+      --border: #2d3a4d;
+      --text: #e8eef6;
+      --muted: #8b9bb0;
+      --accent: #3d8bfd;
+      --accent2: #20c997;
+      --warn: #f0ad4e;
+      --danger: #e85d5d;
+      --purple: #a78bfa;
+      --radius: 12px;
+      --shadow: 0 8px 24px rgba(0,0,0,.35);
+      --font: "SF Pro Text", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: var(--font); background: var(--bg); color: var(--text);
+      min-height: 100vh;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 14px 22px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #151c26, #10161e);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .02em; }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .nav { display: flex; gap: 6px; flex-wrap: wrap; }
+    .nav button {
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+    }
+    .nav button.active {
+      background: rgba(61,139,253,.15); border-color: rgba(61,139,253,.5); color: #cfe3ff;
+    }
+    .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .controls label { font-size: 12px; color: var(--muted); }
+    select {
+      background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 10px; font-size: 13px;
+    }
+    main { padding: 18px 22px 40px; max-width: 1400px; margin: 0 auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .kpis {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+    .kpi {
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 14px 12px; box-shadow: var(--shadow);
+    }
+    .kpi .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .kpi .value { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+    .kpi .delta { font-size: 11px; margin-top: 6px; color: var(--muted); }
+    .kpi .delta.up { color: var(--danger); }
+    .kpi .delta.down { color: var(--accent2); }
+    .kpi .delta.neutral { color: var(--muted); }
+    .grid2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    @media (max-width: 960px) {
+      .grid2, .grid3 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; box-shadow: var(--shadow); min-height: 280px;
+    }
+    .card h3 {
+      margin: 0 0 10px; font-size: 13px; font-weight: 600; color: #c5d0de;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .card h3 small { color: var(--muted); font-weight: 400; }
+    .chart-wrap { position: relative; height: 240px; }
+    .chart-wrap.tall { height: 300px; }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+    }
+    th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 500; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    .note {
+      margin-top: 16px; padding: 12px 14px; border-radius: 10px;
+      background: rgba(61,139,253,.08); border: 1px solid rgba(61,139,253,.25);
+      color: #b7c9df; font-size: 12px; line-height: 1.55;
+    }
+    .note strong { color: #e8eef6; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      background: rgba(32,201,151,.12); color: #7dtob; border: 1px solid rgba(32,201,151,.3);
+      color: #7ddec4;
+    }
+    .loading { padding: 80px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>人力资源 · 薪酬与人员分析看板</h1>
+      <span>面试演示 · 模拟数据 · Mac 浏览器可直接使用</span>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="overview" class="active">总览</button>
+      <button data-page="turnover">离职分析</button>
+      <button data-page="cost">薪酬成本</button>
+      <button data-page="metric">指标口径</button>
+    </nav>
+    <div class="controls">
+      <label for="monthSel">月份</label>
+      <select id="monthSel"></select>
+    </div>
+  </header>
+
+  <main id="app">
+    <div class="loading">加载数据中…</div>
+  </main>
+
+  <script>
+    const fmt = {
+      int: n => (n == null || isNaN(n)) ? "—" : Math.round(n).toLocaleString("zh-CN"),
+      pct: n => (n == null || isNaN(n)) ? "—" : (n * 100).toFixed(2) + "%",
+      pct1: n => (n == null || isNaN(n)) ? "—" : (n * 100).toFixed(1) + "%",
+      money: n => {
+        if (n == null || isNaN(n)) return "—";
+        if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(2) + " 亿";
+        if (Math.abs(n) >= 1e4) return (n / 1e4).toFixed(1) + " 万";
+        return n.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+      },
+      moneyFull: n => (n == null || isNaN(n)) ? "—" : "¥" + Math.round(n).toLocaleString("zh-CN"),
+    };
+
+    const charts = {};
+    let DATA = null;
+    let currentMonth = null;
+
+    function destroyCharts() {
+      Object.values(charts).forEach(c => c.destroy());
+      for (const k of Object.keys(charts)) delete charts[k];
+    }
+
+    function monthLabel(m) {
+      const [y, mo] = m.split("-");
+      return `${y}年${Number(mo)}月`;
+    }
+
+    function getMonthRow(m) {
+      return DATA.months.find(x => x.month === m);
+    }
+
+    function prevMonth(m) {
+      const idx = DATA.months.findIndex(x => x.month === m);
+      return idx > 0 ? DATA.months[idx - 1] : null;
+    }
+
+    function deltaHtml(cur, prev, invert = false) {
+      if (prev == null || prev === 0 || cur == null) return `<div class="delta neutral">环比 —</div>`;
+      const d = (cur - prev) / Math.abs(prev);
+      const pts = (cur - prev);
+      // for rates we may pass isRate
+      const upIsBad = !invert;
+      let cls = "neutral";
+      if (d > 0.001) cls = upIsBad ? "up" : "down";
+      if (d < -0.001) cls = upIsBad ? "down" : "up";
+      const sign = d > 0 ? "+" : "";
+      return `<div class="delta ${cls}">环比 ${sign}${(d * 100).toFixed(1)}%</div>`;
+    }
+
+    function deltaRateHtml(cur, prev) {
+      if (prev == null || cur == null) return `<div class="delta neutral">环比 —</div>`;
+      const pts = (cur - prev) * 100;
+      const cls = pts > 0.01 ? "up" : pts < -0.01 ? "down" : "neutral";
+      const sign = pts > 0 ? "+" : "";
+      return `<div class="delta ${cls}">环比 ${sign}${pts.toFixed(2)} ppt</div>`;
+    }
+
+    function chartDefaults() {
+      Chart.defaults.color = "#8b9bb0";
+      Chart.defaults.borderColor = "rgba(45,58,77,.8)";
+      Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    }
+
+    function makeLineBar(canvasId, labels, datasets, opts = {}) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      charts[canvasId] = new Chart(ctx, {
+        type: "bar",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+            tooltip: { callbacks: opts.tooltipCallbacks || {} },
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              position: "left",
+              grid: { color: "rgba(45,58,77,.5)" },
+              ticks: opts.yTicks || {},
+            },
+            ...(opts.y1 ? {
+              y1: {
+                position: "right",
+                grid: { drawOnChartArea: false },
+                ticks: opts.y1Ticks || {},
+              }
+            } : {}),
+          },
+        },
+      });
+    }
+
+    function render() {
+      destroyCharts();
+      const m = currentMonth;
+      const row = getMonthRow(m);
+      const prev = prevMonth(m);
+      const app = document.getElementById("app");
+
+      const monthLabels = DATA.months.map(x => monthLabel(x.month));
+
+      app.innerHTML = `
+        <section class="page active" id="page-overview">
+          <div class="kpis">
+            <div class="kpi"><div class="label">期末在职</div><div class="value">${fmt.int(row.headcount_end)}</div>${deltaHtml(row.headcount_end, prev?.headcount_end, true)}</div>
+            <div class="kpi"><div class="label">净增员（入−离）</div><div class="value">${fmt.int(row.hires - row.leaves)}</div><div class="delta neutral">入 ${fmt.int(row.hires)} / 离 ${fmt.int(row.leaves)}</div></div>
+            <div class="kpi"><div class="label">离职率（平均在职）</div><div class="value">${fmt.pct(row.turnover_rate)}</div>${deltaRateHtml(row.turnover_rate, prev?.turnover_rate)}</div>
+            <div class="kpi"><div class="label">编制占用率</div><div class="value">${fmt.pct1(row.occupancy_rate)}</div>${deltaRateHtml(row.occupancy_rate, prev?.occupancy_rate)}</div>
+            <div class="kpi"><div class="label">人工成本合计</div><div class="value">${fmt.money(row.total_cost)}</div>${deltaHtml(row.total_cost, prev?.total_cost)}</div>
+            <div class="kpi"><div class="label">人均人工成本</div><div class="value">${fmt.money(row.cost_per_capita)}</div>${deltaHtml(row.cost_per_capita, prev?.cost_per_capita)}</div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>在职与入离职趋势 <small>柱=入/离职 · 线=期末在职</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_hc_flow"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>离职率与编制占用 <small>双轴 %</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_rate"></canvas></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>当月部门在职人数 <small>${monthLabel(m)}</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_dept_hc"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>当月部门健康度矩阵 <small>在职 / 离职 / 占用 / 人均成本</small></h3>
+              <div style="max-height:300px;overflow:auto">
+                <table id="tbl_overview"></table>
+              </div>
+            </div>
+          </div>
+          <div class="note">
+            <strong>演示提示：</strong>离职率 = 当期离职人数 ÷ 平均在职（(期初+期末)/2）。
+            1 月成本偏高是因为模拟数据将年终奖计入 1 月，属于季节性，不是「突然失控」。
+            当前选中：<span class="pill">${monthLabel(m)}</span>
+          </div>
+        </section>
+
+        <section class="page" id="page-turnover">
+          <div class="kpis">
+            <div class="kpi"><div class="label">离职人数</div><div class="value">${fmt.int(row.leaves)}</div>${deltaHtml(row.leaves, prev?.leaves)}</div>
+            <div class="kpi"><div class="label">主动离职</div><div class="value">${fmt.int(row.leaves_vol)}</div><div class="delta neutral">占离职 ${fmt.pct1(row.leaves ? row.leaves_vol/row.leaves : 0)}</div></div>
+            <div class="kpi"><div class="label">被动离职</div><div class="value">${fmt.int(row.leaves_invol)}</div><div class="delta neutral">占离职 ${fmt.pct1(row.leaves ? row.leaves_invol/row.leaves : 0)}</div></div>
+            <div class="kpi"><div class="label">主动离职率</div><div class="value">${fmt.pct(row.leaves_vol / row.headcount_avg)}</div><div class="delta neutral">分母=平均在职</div></div>
+            <div class="kpi"><div class="label">被动离职率</div><div class="value">${fmt.pct(row.leaves_invol / row.headcount_avg)}</div><div class="delta neutral">分母=平均在职</div></div>
+            <div class="kpi"><div class="label">整体离职率</div><div class="value">${fmt.pct(row.turnover_rate)}</div>${deltaRateHtml(row.turnover_rate, prev?.turnover_rate)}</div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>主动 / 被动离职人数趋势</h3>
+              <div class="chart-wrap tall"><canvas id="c_vol"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>当月离职原因 <small>${monthLabel(m)}</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_reason"></canvas></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>当月部门离职人数</h3>
+              <div class="chart-wrap tall"><canvas id="c_dept_leave"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>当月离职司龄分布</h3>
+              <div class="chart-wrap tall"><canvas id="c_tenure_leave"></canvas></div>
+            </div>
+          </div>
+          <div class="note">
+            <strong>分析路径（面试口述）：</strong>先对口径与基数 → 拆部门/职级/司龄/试用期 → 看是否集中在单团队或入职批次 →
+            对照业务与原因标签 → 判断结构性 vs 个案 → 给招聘/管理/薪酬动作建议。
+          </div>
+        </section>
+
+        <section class="page" id="page-cost">
+          <div class="kpis">
+            <div class="kpi"><div class="label">人工成本合计</div><div class="value">${fmt.money(row.total_cost)}</div>${deltaHtml(row.total_cost, prev?.total_cost)}</div>
+            <div class="kpi"><div class="label">人均成本</div><div class="value">${fmt.money(row.cost_per_capita)}</div>${deltaHtml(row.cost_per_capita, prev?.cost_per_capita)}</div>
+            <div class="kpi" id="kpi_bonus"><div class="label">奖金（当月）</div><div class="value">—</div><div class="delta neutral">含年终/专项</div></div>
+            <div class="kpi" id="kpi_ss"><div class="label">企业社保+公积金</div><div class="value">—</div><div class="delta neutral">雇主侧简化口径</div></div>
+            <div class="kpi" id="kpi_base"><div class="label">固定工资合计</div><div class="value">—</div><div class="delta neutral">base_salary</div></div>
+            <div class="kpi"><div class="label">平均在职</div><div class="value">${fmt.int(row.headcount_avg)}</div><div class="delta neutral">成本分母</div></div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>成本趋势与人均 <small>左轴总成本 · 右轴人均</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_cost_trend"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>成本结构（当月）</h3>
+              <div class="chart-wrap tall"><canvas id="c_cost_pie"></canvas></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>部门人均成本 <small>${monthLabel(m)}</small></h3>
+              <div class="chart-wrap tall"><canvas id="c_dept_cpc"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>职级成本矩阵</h3>
+              <div style="max-height:300px;overflow:auto">
+                <table id="tbl_level"></table>
+              </div>
+            </div>
+          </div>
+          <div class="note">
+            <strong>合规：</strong>演示仅展示聚合薪酬，无真实个人信息。真实环境应用 RLS / 最小权限，明细到人需脱敏。
+          </div>
+        </section>
+
+        <section class="page" id="page-metric">
+          <div class="card" style="min-height:auto">
+            <h3>核心指标口径 <small>与模拟库、面试准备文档一致</small></h3>
+            <table>
+              <thead><tr><th>指标</th><th style="text-align:left">口径</th><th>本看板数据源</th></tr></thead>
+              <tbody>
+                <tr><td>期末在职</td><td style="text-align:left">月末快照 status=active 计数</td><td>fact_snapshot</td></tr>
+                <tr><td>平均在职</td><td style="text-align:left">(期初在职 + 期末在职) / 2</td><td>agg / 推算</td></tr>
+                <tr><td>离职率</td><td style="text-align:left">当期离职人数 ÷ 平均在职</td><td>event + 快照</td></tr>
+                <tr><td>主动/被动离职率</td><td style="text-align:left">按 leave_category 拆分后同上</td><td>dim_leave_reason</td></tr>
+                <tr><td>编制占用率</td><td style="text-align:left">实际在职 ÷ 编制人数</td><td>fact_hc_budget</td></tr>
+                <tr><td>空编率</td><td style="text-align:left">1 − 占用率</td><td>同上</td></tr>
+                <tr><td>人均人工成本</td><td style="text-align:left">当期总成本 ÷ 平均在职</td><td>fact_cost</td></tr>
+                <tr><td>净增员</td><td style="text-align:left">入职 − 离职（未单列调动）</td><td>fact_event</td></tr>
+              </tbody>
+            </table>
+            <div class="note" style="margin-top:14px">
+              <strong>2 分钟话术：</strong>我用约 4000 人、12 个月模拟人事与成本数据，按「总览 → 离职 → 成本」三层做看板。
+              建模上用月末快照 + 事件事实 + 成本/编制；离职率用平均在职作分母。上岗后先对齐 HR/财务口径，再固化月报节奏。
+              <br><br>
+              数据文件目录：<code>data/csv/</code> · 说明文档：<code>PowerBI看板搭建与核心指标说明.md</code>
+              <br>规模：期末在职 ${fmt.int(DATA.months.at(-1).headcount_end)} · 周期 2025-01~12 · 模拟数据 seed=42
+            </div>
+          </div>
+        </section>
+      `;
+
+      // charts - overview
+      makeLineBar("c_hc_flow", monthLabels, [
+        {
+          type: "line", label: "期末在职", data: DATA.months.map(x => x.headcount_end),
+          borderColor: "#3d8bfd", backgroundColor: "rgba(61,139,253,.15)", tension: .25, yAxisID: "y1", order: 0,
+        },
+        {
+          type: "bar", label: "入职", data: DATA.months.map(x => x.hires),
+          backgroundColor: "rgba(32,201,151,.7)", yAxisID: "y", order: 1,
+        },
+        {
+          type: "bar", label: "离职", data: DATA.months.map(x => x.leaves),
+          backgroundColor: "rgba(232,93,93,.7)", yAxisID: "y", order: 2,
+        },
+      ], {
+        y1: true,
+        yTicks: { callback: v => v },
+        y1Ticks: { callback: v => v },
+      });
+
+      // fix: Chart.js mixed - recreate properly
+      charts.c_hc_flow?.destroy();
+      charts.c_hc_flow = new Chart(document.getElementById("c_hc_flow"), {
+        data: {
+          labels: monthLabels,
+          datasets: [
+            { type: "bar", label: "入职", data: DATA.months.map(x => x.hires), backgroundColor: "rgba(32,201,151,.75)", yAxisID: "y" },
+            { type: "bar", label: "离职", data: DATA.months.map(x => x.leaves), backgroundColor: "rgba(232,93,93,.75)", yAxisID: "y" },
+            { type: "line", label: "期末在职", data: DATA.months.map(x => x.headcount_end), borderColor: "#3d8bfd", backgroundColor: "rgba(61,139,253,.1)", tension: .3, yAxisID: "y1", borderWidth: 2, pointRadius: 2 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { position: "left", title: { display: true, text: "入离职人数", color: "#8b9bb0" }, grid: { color: "rgba(45,58,77,.45)" } },
+            y1: { position: "right", title: { display: true, text: "在职", color: "#8b9bb0" }, grid: { drawOnChartArea: false } },
+          },
+        },
+      });
+
+      charts.c_rate = new Chart(document.getElementById("c_rate"), {
+        type: "line",
+        data: {
+          labels: monthLabels,
+          datasets: [
+            { label: "离职率", data: DATA.months.map(x => +(x.turnover_rate * 100).toFixed(2)), borderColor: "#e85d5d", tension: .3, borderWidth: 2 },
+            { label: "编制占用率", data: DATA.months.map(x => +(x.occupancy_rate * 100).toFixed(1)), borderColor: "#20c997", tension: .3, borderWidth: 2 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 10 } } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { ticks: { callback: v => v + "%" }, grid: { color: "rgba(45,58,77,.45)" } },
+          },
+        },
+      });
+
+      const deptHc = DATA.dept_hc.filter(x => x.month === m).sort((a, b) => b.headcount - a.headcount);
+      charts.c_dept_hc = new Chart(document.getElementById("c_dept_hc"), {
+        type: "bar",
+        data: {
+          labels: deptHc.map(x => x.dept_name),
+          datasets: [{ label: "在职", data: deptHc.map(x => x.headcount), backgroundColor: "rgba(61,139,253,.8)" }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { color: "rgba(45,58,77,.45)" } }, y: { grid: { display: false } } },
+        },
+      });
+
+      // overview table
+      const leaveMap = Object.fromEntries(
+        DATA.dept_leave.filter(x => x.month === m).map(x => [x.dept_name, x])
+      );
+      const budMap = Object.fromEntries(
+        DATA.dept_hc_budget.filter(x => x.month === m).map(x => [x.dept_name, x])
+      );
+      const costMap = Object.fromEntries(
+        DATA.dept_cost.filter(x => x.month === m).map(x => [x.dept_name, x])
+      );
+      const tbl = document.getElementById("tbl_overview");
+      tbl.innerHTML = `<thead><tr>
+        <th>部门</th><th>在职</th><th>入职</th><th>离职</th><th>占用率</th><th>人均成本</th>
+      </tr></thead><tbody>` + deptHc.map(d => {
+        const lv = leaveMap[d.dept_name] || {};
+        const bud = budMap[d.dept_name] || {};
+        const ct = costMap[d.dept_name] || {};
+        const occ = bud.hc_budget ? bud.hc_actual / bud.hc_budget : null;
+        return `<tr>
+          <td>${d.dept_name}</td>
+          <td>${fmt.int(d.headcount)}</td>
+          <td>${fmt.int(lv.hires || 0)}</td>
+          <td>${fmt.int(lv.leaves || 0)}</td>
+          <td>${occ == null ? "—" : fmt.pct1(occ)}</td>
+          <td>${ct.cost_per_capita != null ? fmt.money(ct.cost_per_capita) : "—"}</td>
+        </tr>`;
+      }).join("") + "</tbody>";
+
+      // turnover charts
+      charts.c_vol = new Chart(document.getElementById("c_vol"), {
+        type: "bar",
+        data: {
+          labels: monthLabels,
+          datasets: [
+            { label: "主动", data: DATA.vol_invol.map(x => x.vol), backgroundColor: "rgba(240,173,78,.85)", stacked: true },
+            { label: "被动", data: DATA.vol_invol.map(x => x.invol), backgroundColor: "rgba(232,93,93,.75)", stacked: true },
+            { label: "其他", data: DATA.vol_invol.map(x => x.other), backgroundColor: "rgba(139,155,176,.6)", stacked: true },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 10 } } },
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, grid: { color: "rgba(45,58,77,.45)" } },
+          },
+        },
+      });
+
+      const reasons = DATA.reasons.filter(x => x.month === m).sort((a, b) => b.n - a.n);
+      charts.c_reason = new Chart(document.getElementById("c_reason"), {
+        type: "doughnut",
+        data: {
+          labels: reasons.map(x => x.reason_name),
+          datasets: [{
+            data: reasons.map(x => x.n),
+            backgroundColor: ["#3d8bfd","#20c997","#f0ad4e","#e85d5d","#a78bfa","#5bc0de","#d9534f","#9b59b6","#1abc9c","#95a5a6"],
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "right", labels: { boxWidth: 10, font: { size: 11 } } } },
+        },
+      });
+
+      const deptLeave = DATA.dept_leave.filter(x => x.month === m && (x.leaves || 0) > 0)
+        .sort((a, b) => (b.leaves || 0) - (a.leaves || 0));
+      charts.c_dept_leave = new Chart(document.getElementById("c_dept_leave"), {
+        type: "bar",
+        data: {
+          labels: deptLeave.map(x => x.dept_name),
+          datasets: [{ label: "离职", data: deptLeave.map(x => x.leaves), backgroundColor: "rgba(232,93,93,.8)" }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { color: "rgba(45,58,77,.45)" } }, y: { grid: { display: false } } },
+        },
+      });
+
+      const tenureOrder = ["0-3月", "3-12月", "1-3年", "3-5年", "5年+"];
+      const tenureLeave = DATA.tenure_leave.filter(x => x.month === m);
+      const tenureMap = Object.fromEntries(tenureLeave.map(x => [x.tenure_band, x.n]));
+      charts.c_tenure_leave = new Chart(document.getElementById("c_tenure_leave"), {
+        type: "bar",
+        data: {
+          labels: tenureOrder,
+          datasets: [{ label: "离职人数", data: tenureOrder.map(t => tenureMap[t] || 0), backgroundColor: "rgba(167,139,250,.85)" }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: "rgba(45,58,77,.45)" } } },
+        },
+      });
+
+      // cost
+      const cs = DATA.cost_struct.find(x => x.month === m) || {};
+      document.querySelector("#kpi_bonus .value").textContent = fmt.money(cs.bonus);
+      document.querySelector("#kpi_ss .value").textContent = fmt.money((cs.social_security_co || 0) + (cs.housing_fund_co || 0));
+      document.querySelector("#kpi_base .value").textContent = fmt.money(cs.base_salary);
+
+      charts.c_cost_trend = new Chart(document.getElementById("c_cost_trend"), {
+        data: {
+          labels: monthLabels,
+          datasets: [
+            {
+              type: "bar", label: "总成本", data: DATA.months.map(x => x.total_cost),
+              backgroundColor: "rgba(61,139,253,.55)", yAxisID: "y",
+            },
+            {
+              type: "line", label: "人均成本", data: DATA.months.map(x => x.cost_per_capita),
+              borderColor: "#f0ad4e", tension: .3, yAxisID: "y1", borderWidth: 2, pointRadius: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 10 } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const v = ctx.parsed.y;
+                  return ctx.dataset.label + ": " + (ctx.dataset.yAxisID === "y1" ? fmt.moneyFull(v) : fmt.money(v));
+                },
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { ticks: { callback: v => fmt.money(v) }, grid: { color: "rgba(45,58,77,.45)" } },
+            y1: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => fmt.money(v) } },
+          },
+        },
+      });
+
+      charts.c_cost_pie = new Chart(document.getElementById("c_cost_pie"), {
+        type: "doughnut",
+        data: {
+          labels: ["基本工资", "奖金", "加班", "企业社保", "公积金(企)", "其他"],
+          datasets: [{
+            data: [cs.base_salary, cs.bonus, cs.overtime_pay, cs.social_security_co, cs.housing_fund_co, cs.other_cost],
+            backgroundColor: ["#3d8bfd", "#f0ad4e", "#e85d5d", "#20c997", "#a78bfa", "#8b9bb0"],
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "right", labels: { boxWidth: 10, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${fmt.money(ctx.parsed)}`,
+              },
+            },
+          },
+        },
+      });
+
+      const deptCpc = DATA.dept_cost.filter(x => x.month === m).sort((a, b) => b.cost_per_capita - a.cost_per_capita);
+      charts.c_dept_cpc = new Chart(document.getElementById("c_dept_cpc"), {
+        type: "bar",
+        data: {
+          labels: deptCpc.map(x => x.dept_name),
+          datasets: [{ label: "人均成本", data: deptCpc.map(x => x.cost_per_capita), backgroundColor: "rgba(240,173,78,.85)" }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => fmt.moneyFull(ctx.parsed.x) } },
+          },
+          scales: {
+            x: { ticks: { callback: v => fmt.money(v) }, grid: { color: "rgba(45,58,77,.45)" } },
+            y: { grid: { display: false } },
+          },
+        },
+      });
+
+      const levels = DATA.level_cost.filter(x => x.month === m).sort((a, b) => a.sort_order - b.sort_order);
+      document.getElementById("tbl_level").innerHTML = `<thead><tr>
+        <th>职级</th><th>人数</th><th>总成本</th><th>平均基本工资</th>
+      </tr></thead><tbody>` + levels.map(l => `<tr>
+        <td>${l.level_name}</td>
+        <td>${fmt.int(l.headcount)}</td>
+        <td>${fmt.money(l.total_cost)}</td>
+        <td>${fmt.moneyFull(l.avg_base)}</td>
+      </tr>`).join("") + "</tbody>";
+
+      // restore active page
+      const activeBtn = document.querySelector(".nav button.active");
+      const page = activeBtn ? activeBtn.dataset.page : "overview";
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      document.getElementById("page-" + page)?.classList.add("active");
+    }
+
+    function bindNav() {
+      document.getElementById("nav").addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+        document.getElementById("page-" + btn.dataset.page)?.classList.add("active");
+      });
+    }
+
+    async function init() {
+      chartDefaults();
+      const res = await fetch("data.json");
+      DATA = await res.json();
+      currentMonth = DATA.latest_month;
+      const sel = document.getElementById("monthSel");
+      sel.innerHTML = DATA.months.map(m =>
+        `<option value="${m.month}" ${m.month === currentMonth ? "selected" : ""}>${monthLabel(m.month)}</option>`
+      ).join("");
+      sel.addEventListener("change", () => {
+        currentMonth = sel.value;
+        render();
+      });
+      bindNav();
+      render();
+    }
+
+    init().catch(err => {
+      document.getElementById("app").innerHTML =
+        `<div class="loading">数据加载失败：${err.message}<br>请确认通过本地服务打开（不要直接双击 HTML）。</div>`;
+    });
+  </script>
+</body>
+</html>

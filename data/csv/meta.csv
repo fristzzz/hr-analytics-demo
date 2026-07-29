@@ -1,0 +1,10 @@
+﻿key,value
+title,HR Compensation & People Analytics Demo
+locale,zh-CN
+currency,CNY
+period_start,2025-01-01
+period_end,2025-12-31
+seed,42
+target_active_end,4000
+generated_note,模拟数据，仅用于面试/学习演示，非真实个人信息
+version,1.0

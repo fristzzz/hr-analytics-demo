@@ -1,0 +1,11 @@
+﻿reason_code,reason_name,leave_category
+R01,个人发展,vol
+R02,薪酬福利,vol
+R03,工作强度/平衡,vol
+R04,家庭原因,vol
+R05,管理/团队氛围,vol
+R06,试用不合格,invol
+R07,绩效淘汰,invol
+R08,组织调整/裁员,invol
+R09,合同到期不续,invol
+R10,其他,other
